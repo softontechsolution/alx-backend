@@ -5,7 +5,7 @@ Deletion-resilient hypermedia pagination
 
 import csv
 import math
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 
 
 class Server:
@@ -33,42 +33,45 @@ class Server:
         """
         if self.__indexed_dataset is None:
             dataset = self.dataset()
-            truncated_dataset = dataset[:1000]
-            self.__indexed_dataset = {
-                i: dataset[i] for i in range(len(dataset))
-            }
-            
+            self.__indexed_dataset = {}
+            for i, row in enumerate(dataset):
+                self.__indexed_dataset[i] = row
         return self.__indexed_dataset
 
     def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
         """
-        Takes 2 integer arguments and returns a dictionary 
-        Args:
-            index(int): first required index
-            page_size(int): required number of records per page
+        Retrieves a page of data from the dataset
+        with hypermedia pagination information,
+        resilient to deletions in the dataset.
+
+        :param index: The start index of the return page
+        :param page_size: The number of items per page
+        :return: A dictionary containing pagination information
         """
-        dataset = self.indexed_dataset()
-        data_length = len(dataset)
+        assert isinstance(index, int) and index >= 0, "Index
+        must be a non-negative integer"
+        assert isinstance(page_size, int) and page_size > 0, "Page
+        size must be an integer greater than 0"
 
-        assert 0 <= index < data_length
+        indexed_data = self.indexed_dataset()
+        total_items = len(indexed_data)
+        assert index < total_items, "Index out of range"
 
-        response = {}
         data = []
-        response['index'] = index
+        current_index = index
+        count = 0
 
-        for i in range(page_size):
-            while True:
-                curr = dataset.get(index)
-                index += 1
-                if curr is not None:
-                    break
-            data.append(curr)
+        while count < page_size and current_index < total_items:
+            if current_index in indexed_data:
+                data.append(indexed_data[current_index])
+                count += 1
+            current_index += 1
 
-        response['data'] = data
-        response['page_size'] = len(data)
+        next_index = current_index if current_index < total_items else None
 
-        if dataset.get(index):
-            response['next_index'] = index
-        else:
-            response['next_index'] = None
-        return response
+        return {
+            "index": index,
+            "data": data,
+            "page_size": page_size,
+            "next_index": next_index,
+        }
