@@ -5,7 +5,7 @@ Deletion-resilient hypermedia pagination
 
 import csv
 import math
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 
 
 class Server:
@@ -33,45 +33,25 @@ class Server:
         """
         if self.__indexed_dataset is None:
             dataset = self.dataset()
-            self.__indexed_dataset = {}
-            for i, row in enumerate(dataset):
-                self.__indexed_dataset[i] = row
+            truncated_dataset = dataset[:1000]
+            self.__indexed_dataset = {
+                i: dataset[i] for i in range(len(dataset))
+            }
         return self.__indexed_dataset
 
     def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
-        """
-        Retrieves a page of data from the dataset
-        with hypermedia pagination information,
-        resilient to deletions in the dataset.
-
-        :param index: The start index of the return page
-        :param page_size: The number of items per page
-        :return: A dictionary containing pagination information
-        """
-        assert isinstance(index, int) and index >= 0, "Index
-        must be a non-negative integer"
-        assert isinstance(page_size, int) and page_size > 0, "Page
-        size must be an integer greater than 0"
-
-        indexed_data = self.indexed_dataset()
-        total_items = len(indexed_data)
-        assert index < total_items, "Index out of range"
-
-        data = []
-        current_index = index
-        count = 0
-
-        while count < page_size and current_index < total_items:
-            if current_index in indexed_data:
-                data.append(indexed_data[current_index])
-                count += 1
-            current_index += 1
-
-        next_index = current_index if current_index < total_items else None
-
-        return {
-            "index": index,
-            "data": data,
-            "page_size": page_size,
-            "next_index": next_index,
-        }
+        """ return a dictionary """
+        assert type(index) == int and type(page_size) == int
+        assert 0 <= index < len(self.indexed_dataset())
+        pages = []
+        next_index = index + page_size
+        for i in range(index, index + page_size):
+            if not self.indexed_dataset().get(i):
+                i += 1
+                next_index += 1
+            pages.append(self.indexed_dataset()[i])
+        return {'index': index,
+                'next_index': next_index,
+                'page_size': page_size,
+                'data': pages
+                }
